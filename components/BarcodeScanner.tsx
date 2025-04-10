@@ -34,7 +34,13 @@ const BarcodeScanner = ({ onScan, onError }: BarcodeScannerProps) => {
           });
         };
 
-        scanner.render(successCallback, onError);
+        // Adaptação para o tipo de erro esperado
+        const errorCallback = (errorMessage: string, error: unknown) => {
+          const errorObj = error instanceof Error ? error : new Error(errorMessage);
+          onError(errorObj);
+        };
+
+        scanner.render(successCallback, errorCallback);
 
         return () => {
           if (scannerRef.current) {
