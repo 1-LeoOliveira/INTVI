@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "📊 Inventário Regional da TI - INTI",
+  title: "Inventário Regional da TI - INTI",
   description: "Sistema web para cadastro e controle de equipamentos de TI da empresa",
   keywords: ["inventário", "TI", "equipamentos", "controle", "gestão"],
   authors: [{ name: "Equipe TI" }],

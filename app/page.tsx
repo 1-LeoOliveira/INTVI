@@ -25,10 +25,6 @@ interface Equipment {
   dataRegistro?: string;
 }
 
-interface Worksheet {
-  name: string;
-}
-
 const InventorySystem = () => {
   const [equipment, setEquipment] = useState<Equipment>({
     id: '',
@@ -990,6 +986,17 @@ const InventorySystem = () => {
                 '⚠️ Para ativar sincronização, configure NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN no arquivo .env.local'
               }
             </p>
+          </div>
+        </div>
+
+        {/* Avisos importantes para produção */}
+        <div className="mt-6 bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">⚠️ Avisos Importantes</h3>
+          <div className="text-sm text-yellow-700 space-y-2">
+            <p>• Os dados são mantidos apenas na memória durante a sessão.</p>
+            <p>• Para persistência permanente, configure a integração com Excel Online.</p>
+            <p>• Use o botão &quot;Backup JSON&quot; regularmente para salvar seus dados.</p>
+            <p>• Configure as variáveis de ambiente no Vercel para a sincronização automática.</p>
           </div>
         </div>
       </div>
