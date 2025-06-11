@@ -25,6 +25,10 @@ interface Equipment {
   dataRegistro?: string;
 }
 
+interface Worksheet {
+  name: string;
+}
+
 const InventorySystem = () => {
   const [equipment, setEquipment] = useState<Equipment>({
     id: '',
@@ -553,7 +557,7 @@ const InventorySystem = () => {
                   
                   if (worksheetsResponse.ok) {
                     const worksheetsData = await worksheetsResponse.json();
-                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map((w: any) => w.name));
+                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map((w: Worksheet) => w.name));
                   }
                 } catch (worksheetError) {
                   console.error('❌ Erro worksheets:', worksheetError);
