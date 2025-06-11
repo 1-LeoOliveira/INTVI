@@ -313,7 +313,7 @@ const InventorySystem = () => {
           nextRow = rangeData.rowCount + 1;
           console.log('📊 Próxima linha disponível:', nextRow);
         }
-      } catch (rangeErr) {
+      } catch {
         console.warn('⚠️ Erro ao obter range, usando linha 2');
       }
 
