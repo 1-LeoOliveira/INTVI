@@ -553,7 +553,7 @@ const InventorySystem = () => {
                   
                   if (worksheetsResponse.ok) {
                     const worksheetsData = await worksheetsResponse.json();
-                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map(w => w.name));
+                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map((w: any) => w.name));
                   }
                 } catch (worksheetError) {
                   console.error('❌ Erro worksheets:', worksheetError);
