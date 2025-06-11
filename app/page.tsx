@@ -3,8 +3,30 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
+interface Equipment {
+  id?: string;
+  tipo: string;
+  marca: string;
+  modelo: string;
+  numeroSerie: string;
+  patrimonio: string;
+  processador: string;
+  memoria: string;
+  armazenamento: string;
+  sistemaOperacional: string;
+  usuario: string;
+  setor: string;
+  localizacao: string;
+  dataAquisicao: string;
+  valorAquisicao: string;
+  garantia: string;
+  status: string;
+  observacoes: string;
+  dataRegistro?: string;
+}
+
 const InventorySystem = () => {
-  const [equipment, setEquipment] = useState({
+  const [equipment, setEquipment] = useState<Equipment>({
     tipo: '',
     marca: '',
     modelo: '',
@@ -24,11 +46,11 @@ const InventorySystem = () => {
     observacoes: ''
   });
 
-  const [equipmentList, setEquipmentList] = useState([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Status de sincronização apenas para Excel
   const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
@@ -44,7 +66,7 @@ const InventorySystem = () => {
     }
   }, [syncStatus]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setEquipment(prev => ({
       ...prev,
@@ -75,7 +97,7 @@ const InventorySystem = () => {
     setEditingId(null);
   };
 
-  const sendToExcelOnline = async (data) => {
+  const sendToExcelOnline = async (data: Equipment) => {
     try {
       // Configurações para SharePoint Online
       const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
@@ -351,7 +373,7 @@ const InventorySystem = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage('');
@@ -397,7 +419,7 @@ const InventorySystem = () => {
     }
   };
 
-  const handleEdit = (item) => {
+  const handleEdit = (item: Equipment) => {
     setEquipment(item);
     setEditingId(item.id);
     if (typeof window !== 'undefined') {
@@ -405,7 +427,7 @@ const InventorySystem = () => {
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: string) => {
     if (typeof window !== 'undefined' && window.confirm('Tem certeza que deseja excluir este equipamento?')) {
       setEquipmentList(prev => prev.filter(item => item.id !== id));
       setMessage('🗑️ Equipamento excluído com sucesso!');
