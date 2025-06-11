@@ -494,92 +494,6 @@ const InventorySystem = () => {
     setMessage('💾 Backup criado com sucesso!');
   };
 
-  const debugSharePoint = async () => {
-    if (typeof window === 'undefined') return;
-    
-    console.log('🔧 === DEBUG SHAREPOINT ONLINE ===');
-    console.log('🔑 Token configurado:', !!process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN);
-    console.log('📊 File ID:', process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF');
-    console.log('📋 Worksheet:', process.env.NEXT_PUBLIC_EXCEL_WORKSHEET_NAME || 'Inventário');
-    console.log('🌐 Site: santacruzdistribuidora.sharepoint.com/sites/ProjetosTIInfraestrutura');
-    
-    if (process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN) {
-      const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
-      const SITE_PATH = '/sites/ProjetosTIInfraestrutura';
-      
-      // Teste 1: Conectividade básica
-      try {
-        const meResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-          headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
-        });
-        console.log('🔗 Conectividade Graph API:', meResponse.status);
-        
-        if (meResponse.ok) {
-          const meData = await meResponse.json();
-          console.log('👤 Usuário:', meData.displayName);
-        }
-      } catch (error) {
-        console.error('❌ Erro conectividade:', error);
-      }
-      
-      // Teste 2: Acesso ao site
-      try {
-        const siteResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}`, {
-          headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
-        });
-        console.log('🌐 Acesso ao site:', siteResponse.status);
-        
-        if (siteResponse.ok) {
-          const siteData = await siteResponse.json();
-          console.log('✅ Site encontrado:', siteData.displayName);
-          console.log('🆔 Site ID:', siteData.id);
-          
-          // Teste 3: Buscar o arquivo Excel
-          try {
-            const searchResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive/root/search(q='Inventário.xlsx')`, {
-              headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
-            });
-            console.log('🔍 Busca arquivo:', searchResponse.status);
-            
-            if (searchResponse.ok) {
-              const searchData = await searchResponse.json();
-              if (searchData.value && searchData.value.length > 0) {
-                console.log('📊 Arquivo encontrado:', searchData.value[0].name);
-                console.log('🆔 Arquivo ID:', searchData.value[0].id);
-                console.log('📁 Caminho:', searchData.value[0].webUrl);
-                
-                // Teste 4: Acessar worksheets
-                try {
-                  const worksheetsResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive/items/${searchData.value[0].id}/workbook/worksheets`, {
-                    headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
-                  });
-                  console.log('📋 Acesso worksheets:', worksheetsResponse.status);
-                  
-                  if (worksheetsResponse.ok) {
-                    const worksheetsData = await worksheetsResponse.json();
-                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map((w: Worksheet) => w.name));
-                  }
-                } catch (worksheetError) {
-                  console.error('❌ Erro worksheets:', worksheetError);
-                }
-              } else {
-                console.log('❌ Arquivo não encontrado na busca');
-              }
-            }
-          } catch (searchError) {
-            console.error('❌ Erro busca arquivo:', searchError);
-          }
-        } else {
-          console.error('❌ Erro acesso site:', siteResponse.status);
-        }
-      } catch (siteError) {
-        console.error('❌ Erro site:', siteError);
-      }
-    }
-    
-    alert('🔧 Debug SharePoint executado! Verifique o console (F12).');
-  };
-
   const filteredEquipment = equipmentList.filter(item =>
     Object.values(item).some(value =>
       value.toString().toLowerCase().includes(searchTerm.toLowerCase())
@@ -947,7 +861,6 @@ const InventorySystem = () => {
                   ❌ Cancelar Edição
                 </button>
               )}
-              
             </div>
           </form>
         </div>
