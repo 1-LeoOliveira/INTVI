@@ -80,7 +80,6 @@ const InventorySystem = () => {
       // Configurações para SharePoint Online
       const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
       const SITE_PATH = '/sites/ProjetosTIInfraestrutura';
-      const FILE_ID = process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF';
       const WORKSHEET_NAME = process.env.NEXT_PUBLIC_EXCEL_WORKSHEET_NAME || 'Inventário';
       const ACCESS_TOKEN = process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN;
       
@@ -146,10 +145,12 @@ const InventorySystem = () => {
 
       // Construir URL base para o arquivo
       let fileUrl = '';
+      const fileId = process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF';
+      
       if (siteId) {
-        fileUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${FILE_ID}`;
+        fileUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${fileId}`;
       } else {
-        fileUrl = `https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}:/drive/items/${FILE_ID}`;
+        fileUrl = `https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}:/drive/items/${fileId}`;
       }
 
       console.log('📁 URL do arquivo:', fileUrl);
@@ -312,7 +313,7 @@ const InventorySystem = () => {
           nextRow = rangeData.rowCount + 1;
           console.log('📊 Próxima linha disponível:', nextRow);
         }
-      } catch (rangeError) {
+      } catch (rangeErr) {
         console.warn('⚠️ Erro ao obter range, usando linha 2');
       }
 
@@ -471,7 +472,6 @@ const InventorySystem = () => {
     if (process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN) {
       const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
       const SITE_PATH = '/sites/ProjetosTIInfraestrutura';
-      const FILE_ID = process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF';
       
       // Teste 1: Conectividade básica
       try {
@@ -879,7 +879,7 @@ const InventorySystem = () => {
                   name="observacoes"
                   value={equipment.observacoes}
                   onChange={handleInputChange}
-                  rows="3"
+                  rows={3}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Observações adicionais sobre o equipamento"
                 />
@@ -1059,7 +1059,7 @@ const InventorySystem = () => {
           <div className="text-sm text-yellow-700 space-y-2">
             <p>• Os dados são mantidos apenas na memória durante a sessão.</p>
             <p>• Para persistência permanente, configure a integração com Excel Online.</p>
-            <p>• Use o botão "Backup JSON" regularmente para salvar seus dados.</p>
+            <p>• Use o botão &quot;Backup JSON&quot; regularmente para salvar seus dados.</p>
             <p>• Configure as variáveis de ambiente no Vercel para a sincronização automática.</p>
           </div>
         </div>
