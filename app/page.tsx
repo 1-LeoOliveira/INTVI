@@ -162,7 +162,8 @@ const InventorySystem = () => {
           throw new Error(`Erro ao acessar site: ${siteResponse.status}`);
         }
       } catch (siteError) {
-        console.warn('⚠️ Erro ao obter site, tentando método direto:', siteError.message);
+        const errorMessage = siteError instanceof Error ? siteError.message : 'Erro desconhecido';
+        console.warn('⚠️ Erro ao obter site, tentando método direto:', errorMessage);
       }
 
       // Construir URL base para o arquivo
@@ -214,7 +215,8 @@ const InventorySystem = () => {
           }
         }
       } catch (fileError) {
-        console.warn('⚠️ Erro verificação arquivo:', fileError.message);
+        const errorMessage = fileError instanceof Error ? fileError.message : 'Erro desconhecido';
+        console.warn('⚠️ Erro verificação arquivo:', errorMessage);
       }
 
       // Tentar Tables API
@@ -266,7 +268,8 @@ const InventorySystem = () => {
           }
         }
       } catch (tableError) {
-        console.warn('⚠️ Erro Tables API:', tableError.message);
+        const errorMessage = tableError instanceof Error ? tableError.message : 'Erro desconhecido';
+        console.warn('⚠️ Erro Tables API:', errorMessage);
       }
 
       // Range API como fallback
@@ -367,9 +370,10 @@ const InventorySystem = () => {
       }
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       console.error('❌ Erro geral SharePoint Online:', error);
       setSyncStatus('error');
-      throw new Error(`SharePoint Online: ${error.message}`);
+      throw new Error(`SharePoint Online: ${errorMessage}`);
     }
   };
 
@@ -407,13 +411,15 @@ const InventorySystem = () => {
         await sendToExcelOnline(newEquipment);
         successMessage += ' ✅ Sincronizado com Excel Online!';
       } catch (error) {
-        successMessage += ` ⚠️ Dados salvos em memória. Erro na sincronização: ${error.message}`;
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        successMessage += ` ⚠️ Dados salvos em memória. Erro na sincronização: ${errorMessage}`;
       }
       
       setMessage(successMessage);
       resetForm();
     } catch (error) {
-      setMessage(`❌ Erro: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setMessage(`❌ Erro: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
