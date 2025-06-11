@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
 interface Equipment {
-  id?: string;
+  id: string;
   tipo: string;
   marca: string;
   modelo: string;
@@ -27,6 +27,7 @@ interface Equipment {
 
 const InventorySystem = () => {
   const [equipment, setEquipment] = useState<Equipment>({
+    id: '',
     tipo: '',
     marca: '',
     modelo: '',
@@ -76,6 +77,7 @@ const InventorySystem = () => {
 
   const resetForm = () => {
     setEquipment({
+      id: '',
       tipo: '',
       marca: '',
       modelo: '',
@@ -388,7 +390,7 @@ const InventorySystem = () => {
         throw new Error('Preencha pelo menos Tipo, Marca e Modelo');
       }
 
-      const newEquipment = {
+      const newEquipment: Equipment = {
         ...equipment,
         id: editingId || Date.now().toString(),
         dataRegistro: new Date().toLocaleString('pt-BR')
