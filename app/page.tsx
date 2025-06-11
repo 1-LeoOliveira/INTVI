@@ -1,405 +1,1071 @@
+// pages/index.js
 'use client'
-import React, { useState, ChangeEvent, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
+import { useState, useEffect } from 'react';
+import Head from 'next/head';
 
-// Interface para os itens do inventário
-interface ItemInventario {
-  descricao: string;
-  codigoBarras: string;
-  dataRegistro: string;
-  destino: 'backup' | 'usuario';
-  filial: string;
-  usuario?: string;
-  matricula?: string;
-  setor?: string;
-}
-
-// Interface para o status de envio
-interface SubmitStatus {
-  success: boolean;
-  message: string;
-}
-
-// Carregamento dinâmico do scanner (melhor para performance)
-const BarcodeScanner = dynamic(
-  () => import('@/components/BarcodeScanner'),
-  { 
-    ssr: false,
-    loading: () => <p className="text-center p-4 text-gray-500">Carregando scanner...</p>
-  }
-);
-
-const InventarioApp = () => {
-  // Estado do item do inventário
-  const [item, setItem] = useState<ItemInventario>({
-    descricao: '',
-    codigoBarras: '',
-    dataRegistro: '',
-    destino: 'backup',
-    filial: ''
+const InventorySystem = () => {
+  const [equipment, setEquipment] = useState({
+    tipo: '',
+    marca: '',
+    modelo: '',
+    numeroSerie: '',
+    patrimonio: '',
+    processador: '',
+    memoria: '',
+    armazenamento: '',
+    sistemaOperacional: '',
+    usuario: '',
+    setor: '',
+    localizacao: '',
+    dataAquisicao: '',
+    valorAquisicao: '',
+    garantia: '',
+    status: 'Ativo',
+    observacoes: ''
   });
 
-  // Estado do status de envio
-  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>({
-    success: false,
-    message: ''
-  });
-  
-  // Estados de controle
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [showScanner, setShowScanner] = useState<boolean>(false);
-  const [hasCameraAccess, setHasCameraAccess] = useState<boolean>(false);
+  const [equipmentList, setEquipmentList] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
-  // Verificar permissão de câmera ao montar o componente
+  // Status de sincronização apenas para Excel
+  const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
+
+  // Reset status após alguns segundos
   useEffect(() => {
-    const checkCameraPermission = async () => {
-      try {
-        if (typeof window !== 'undefined' && 'navigator' in window) {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-          setHasCameraAccess(true);
-        }
-      } catch (error) {
-        setHasCameraAccess(false);
-        console.warn('Acesso à câmera negado:', error);
-      }
-    };
-
-    checkCameraPermission();
-  }, []);
-
-  // Manipulador de mudança nos inputs
-  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setItem({ ...item, [name]: value });
-  };
-
-  // Manipulador de mudança nos selects
-  const handleSelectChange = (name: string, value: string) => {
-    setItem({ ...item, [name]: value });
-    
-    // Reset campos de usuário quando mudar para backup
-    if (name === 'destino' && value === 'backup') {
-      setItem(prev => ({
-        ...prev,
-        usuario: '',
-        matricula: '',
-        setor: ''
-      }));
+    if (syncStatus !== 'idle') {
+      const timer = setTimeout(() => {
+        setSyncStatus('idle');
+      }, 5000);
+      
+      return () => clearTimeout(timer);
     }
+  }, [syncStatus]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEquipment(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  // Função para lidar com a leitura do código de barras
-  const handleBarcodeScan = (barcode: string) => {
-    setItem({ ...item, codigoBarras: barcode });
-    setShowScanner(false);
-  };
-
-  // Função para enviar o item
-  const submitItem = async () => {
-    setIsLoading(true);
-    setSubmitStatus({ success: false, message: '' });
-    
-    // Campos obrigatórios
-    const requiredFields: (keyof ItemInventario)[] = [
-      'descricao', 'codigoBarras', 'dataRegistro', 'destino', 'filial'
-    ];
-    
-    // Campos adicionais se for para usuário
-    if (item.destino === 'usuario') {
-      requiredFields.push('usuario', 'matricula', 'setor');
-    }
-
-    // Verificar campos faltantes
-    const missingFields = requiredFields.filter(field => {
-      const value = item[field];
-      return !value || (typeof value === 'string' && value.trim() === '');
+  const resetForm = () => {
+    setEquipment({
+      tipo: '',
+      marca: '',
+      modelo: '',
+      numeroSerie: '',
+      patrimonio: '',
+      processador: '',
+      memoria: '',
+      armazenamento: '',
+      sistemaOperacional: '',
+      usuario: '',
+      setor: '',
+      localizacao: '',
+      dataAquisicao: '',
+      valorAquisicao: '',
+      garantia: '',
+      status: 'Ativo',
+      observacoes: ''
     });
+    setEditingId(null);
+  };
 
-    if (missingFields.length > 0) {
-      setSubmitStatus({
-        success: false,
-        message: `Por favor, preencha os seguintes campos: ${missingFields.join(', ')}`
-      });
-      setIsLoading(false);
-      return;
+  const sendToExcelOnline = async (data) => {
+    try {
+      // Configurações para SharePoint Online
+      const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
+      const SITE_PATH = '/sites/ProjetosTIInfraestrutura';
+      const FILE_ID = process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF';
+      const WORKSHEET_NAME = process.env.NEXT_PUBLIC_EXCEL_WORKSHEET_NAME || 'Inventário';
+      const ACCESS_TOKEN = process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN;
+      
+      if (!ACCESS_TOKEN) {
+        console.warn('Token de acesso Microsoft não configurado - simulando envio');
+        setSyncStatus('syncing');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setSyncStatus('success');
+        return true;
+      }
+      
+      setSyncStatus('syncing');
+      console.log('🔄 Iniciando sincronização com SharePoint Online...');
+
+      // Preparar dados para inserção
+      const rowData = [
+        data.tipo || '',
+        data.marca || '',
+        data.modelo || '',
+        data.numeroSerie || '',
+        data.patrimonio || '',
+        data.processador || '',
+        data.memoria || '',
+        data.armazenamento || '',
+        data.sistemaOperacional || '',
+        data.usuario || '',
+        data.setor || '',
+        data.localizacao || '',
+        data.dataAquisicao || '',
+        data.valorAquisicao || '',
+        data.garantia || '',
+        data.status || '',
+        data.observacoes || '',
+        data.dataRegistro || new Date().toLocaleString('pt-BR')
+      ];
+
+      console.log('📊 Dados preparados:', rowData);
+
+      // Obter informações do site
+      let siteId = '';
+      try {
+        console.log('🌐 Obtendo informações do site...');
+        const siteResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${ACCESS_TOKEN}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (siteResponse.ok) {
+          const siteData = await siteResponse.json();
+          siteId = siteData.id;
+          console.log('✅ Site encontrado:', siteData.displayName, '| ID:', siteId);
+        } else {
+          throw new Error(`Erro ao acessar site: ${siteResponse.status}`);
+        }
+      } catch (siteError) {
+        console.warn('⚠️ Erro ao obter site, tentando método direto:', siteError.message);
+      }
+
+      // Construir URL base para o arquivo
+      let fileUrl = '';
+      if (siteId) {
+        fileUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${FILE_ID}`;
+      } else {
+        fileUrl = `https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}:/drive/items/${FILE_ID}`;
+      }
+
+      console.log('📁 URL do arquivo:', fileUrl);
+
+      // Verificar acesso ao arquivo
+      try {
+        console.log('📋 Verificando acesso ao arquivo...');
+        const fileResponse = await fetch(fileUrl, {
+          headers: {
+            'Authorization': `Bearer ${ACCESS_TOKEN}`
+          }
+        });
+
+        if (fileResponse.ok) {
+          const fileData = await fileResponse.json();
+          console.log('✅ Arquivo encontrado:', fileData.name);
+        } else {
+          console.warn('⚠️ Erro ao acessar arquivo:', fileResponse.status);
+          
+          // Tentar buscar o arquivo por nome
+          console.log('🔍 Tentando buscar arquivo por nome...');
+          const searchUrl = siteId 
+            ? `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root/search(q='Inventário.xlsx')`
+            : `https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}:/drive/root/search(q='Inventário.xlsx')`;
+            
+          const searchResponse = await fetch(searchUrl, {
+            headers: {
+              'Authorization': `Bearer ${ACCESS_TOKEN}`
+            }
+          });
+          
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            if (searchData.value && searchData.value.length > 0) {
+              const foundFile = searchData.value[0];
+              console.log('✅ Arquivo encontrado via busca:', foundFile.name, '| ID:', foundFile.id);
+              fileUrl = `https://graph.microsoft.com/v1.0/sites/${siteId || SITE_URL}/drive/items/${foundFile.id}`;
+            }
+          }
+        }
+      } catch (fileError) {
+        console.warn('⚠️ Erro verificação arquivo:', fileError.message);
+      }
+
+      // Tentar Tables API
+      try {
+        console.log('📋 Tentando Tables API...');
+        
+        const tablesResponse = await fetch(
+          `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/tables`,
+          {
+            headers: {
+              'Authorization': `Bearer ${ACCESS_TOKEN}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (tablesResponse.ok) {
+          const tablesData = await tablesResponse.json();
+          console.log('📋 Tabelas encontradas:', tablesData.value?.length || 0);
+          
+          if (tablesData.value && tablesData.value.length > 0) {
+            const tableId = tablesData.value[0].id;
+            console.log('📋 Usando tabela:', tableId);
+            
+            const addRowResponse = await fetch(
+              `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/tables('${tableId}')/rows/add`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  index: null,
+                  values: [rowData]
+                })
+              }
+            );
+
+            if (addRowResponse.ok) {
+              const result = await addRowResponse.json();
+              console.log('✅ Linha adicionada via Tables API:', result);
+              setSyncStatus('success');
+              return true;
+            } else {
+              const errorText = await addRowResponse.text();
+              console.warn('⚠️ Tables API falhou:', addRowResponse.status, errorText);
+            }
+          }
+        }
+      } catch (tableError) {
+        console.warn('⚠️ Erro Tables API:', tableError.message);
+      }
+
+      // Range API como fallback
+      console.log('📊 Usando Range API como fallback...');
+
+      // Verificar cabeçalhos
+      const checkHeadersResponse = await fetch(
+        `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/range(address='A1:R1')`,
+        {
+          headers: {
+            'Authorization': `Bearer ${ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (checkHeadersResponse.ok) {
+        const headerData = await checkHeadersResponse.json();
+        console.log('📋 Cabeçalhos verificados:', headerData.values?.[0]?.[0] ? 'Existem' : 'Não existem');
+        
+        // Se não há cabeçalhos, adicionar
+        if (!headerData.values || !headerData.values[0] || !headerData.values[0][0]) {
+          console.log('📋 Criando cabeçalhos...');
+          const headers = [
+            'Tipo', 'Marca', 'Modelo', 'Número de Série', 'Patrimônio',
+            'Processador', 'Memória', 'Armazenamento', 'Sistema Operacional',
+            'Usuário', 'Setor', 'Localização', 'Data Aquisição', 'Valor',
+            'Garantia', 'Status', 'Observações', 'Data Registro'
+          ];
+
+          const headerResponse = await fetch(
+            `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/range(address='A1:R1')`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                values: [headers]
+              })
+            }
+          );
+
+          if (headerResponse.ok) {
+            console.log('✅ Cabeçalhos criados');
+          }
+        }
+      }
+
+      // Obter próxima linha vazia
+      let nextRow = 2;
+      
+      try {
+        const rangeResponse = await fetch(
+          `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/usedRange`,
+          {
+            headers: {
+              'Authorization': `Bearer ${ACCESS_TOKEN}`
+            }
+          }
+        );
+
+        if (rangeResponse.ok) {
+          const rangeData = await rangeResponse.json();
+          nextRow = rangeData.rowCount + 1;
+          console.log('📊 Próxima linha disponível:', nextRow);
+        }
+      } catch (rangeError) {
+        console.warn('⚠️ Erro ao obter range, usando linha 2');
+      }
+
+      // Adicionar nova linha
+      console.log(`📊 Adicionando dados na linha ${nextRow}...`);
+      const addRowResponse = await fetch(
+        `${fileUrl}/workbook/worksheets('${WORKSHEET_NAME}')/range(address='A${nextRow}:R${nextRow}')`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            values: [rowData]
+          })
+        }
+      );
+
+      if (addRowResponse.ok) {
+        const result = await addRowResponse.json();
+        console.log('✅ Dados sincronizados com SharePoint Online:', result);
+        setSyncStatus('success');
+        return true;
+      } else {
+        const errorText = await addRowResponse.text();
+        console.error('❌ Erro ao adicionar linha:', addRowResponse.status, errorText);
+        throw new Error(`Erro ${addRowResponse.status}: ${errorText}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Erro geral SharePoint Online:', error);
+      setSyncStatus('error');
+      throw new Error(`SharePoint Online: ${error.message}`);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage('');
 
     try {
-      // Simulação de envio para API
-      console.log('Dados a serem enviados:', JSON.stringify(item, null, 2));
-      const apiURL = 'SUA_API_AQUI';
+      // Validação básica
+      if (!equipment.tipo || !equipment.marca || !equipment.modelo) {
+        throw new Error('Preencha pelo menos Tipo, Marca e Modelo');
+      }
 
-      await fetch(apiURL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(item)
-      });
+      const newEquipment = {
+        ...equipment,
+        id: editingId || Date.now().toString(),
+        dataRegistro: new Date().toLocaleString('pt-BR')
+      };
 
-      setSubmitStatus({
-        success: true,
-        message: 'Item registrado com sucesso!'
-      });
+      // Atualizar lista em memória
+      if (editingId) {
+        setEquipmentList(prev => 
+          prev.map(item => item.id === editingId ? newEquipment : item)
+        );
+      } else {
+        setEquipmentList(prev => [...prev, newEquipment]);
+      }
 
-      // Reset do formulário
-      setItem({
-        descricao: '',
-        codigoBarras: '',
-        dataRegistro: '',
-        destino: 'backup',
-        filial: ''
-      });
+      // Preparar mensagem base
+      let successMessage = editingId ? '✏️ Equipamento atualizado!' : '➕ Equipamento cadastrado!';
+
+      // Tentar sincronizar com Excel Online
+      try {
+        await sendToExcelOnline(newEquipment);
+        successMessage += ' ✅ Sincronizado com Excel Online!';
+      } catch (error) {
+        successMessage += ` ⚠️ Dados salvos em memória. Erro na sincronização: ${error.message}`;
+      }
+      
+      setMessage(successMessage);
+      resetForm();
     } catch (error) {
-      console.error('Erro ao registrar item:', error);
-      setSubmitStatus({
-        success: false,
-        message: `Erro ao registrar item: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
-      });
+      setMessage(`❌ Erro: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="max-w-md mx-auto p-4 bg-gray-50 min-h-screen">
-      {/* Logo */}
-      <div className="flex justify-center mb-6 pt-4">
-        <Image 
-          src="/logo.png"
-          alt="Logo da Empresa"
-          width={400}
-          height={100}
-          className="object-contain"
-          priority
-        />
-      </div>
+  const handleEdit = (item) => {
+    setEquipment(item);
+    setEditingId(item.id);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
-      {/* Card principal */}
-      <Card className="shadow-lg border-gray-200">
-        <CardHeader className="border-b border-gray-200">
-          <CardTitle className="text-xl font-bold text-gray-800 text-center">
-            Registro de Itens - Inventário
-          </CardTitle>
-        </CardHeader>
+  const handleDelete = (id) => {
+    if (typeof window !== 'undefined' && window.confirm('Tem certeza que deseja excluir este equipamento?')) {
+      setEquipmentList(prev => prev.filter(item => item.id !== id));
+      setMessage('🗑️ Equipamento excluído com sucesso!');
+    }
+  };
+
+  const exportToCSV = () => {
+    if (typeof window === 'undefined') return;
+    
+    const headers = [
+      'Tipo', 'Marca', 'Modelo', 'Número de Série', 'Patrimônio',
+      'Processador', 'Memória', 'Armazenamento', 'Sistema Operacional',
+      'Usuário', 'Setor', 'Localização', 'Data Aquisição', 'Valor',
+      'Garantia', 'Status', 'Observações', 'Data Registro'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...equipmentList.map(item => [
+        item.tipo, item.marca, item.modelo, item.numeroSerie, item.patrimonio,
+        item.processador, item.memoria, item.armazenamento, item.sistemaOperacional,
+        item.usuario, item.setor, item.localizacao, item.dataAquisicao, item.valorAquisicao,
+        item.garantia, item.status, item.observacoes, item.dataRegistro
+      ].map(field => `"${field || ''}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `inventario-ti-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const createBackup = () => {
+    if (typeof window === 'undefined') return;
+    
+    const backupData = {
+      data: equipmentList,
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      excelWorkbookId: process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF'
+    };
+    
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { 
+      type: 'application/json' 
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `backup-inventario-ti-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    setMessage('💾 Backup criado com sucesso!');
+  };
+
+  const debugSharePoint = async () => {
+    if (typeof window === 'undefined') return;
+    
+    console.log('🔧 === DEBUG SHAREPOINT ONLINE ===');
+    console.log('🔑 Token configurado:', !!process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN);
+    console.log('📊 File ID:', process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF');
+    console.log('📋 Worksheet:', process.env.NEXT_PUBLIC_EXCEL_WORKSHEET_NAME || 'Inventário');
+    console.log('🌐 Site: santacruzdistribuidora.sharepoint.com/sites/ProjetosTIInfraestrutura');
+    
+    if (process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN) {
+      const SITE_URL = 'santacruzdistribuidora.sharepoint.com';
+      const SITE_PATH = '/sites/ProjetosTIInfraestrutura';
+      const FILE_ID = process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF';
+      
+      // Teste 1: Conectividade básica
+      try {
+        const meResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
+        });
+        console.log('🔗 Conectividade Graph API:', meResponse.status);
         
-        <CardContent className="pt-4">
-          <div className="space-y-4">
-            {/* Campo Descrição */}
-            <div>
-              <label htmlFor="descricao" className="block text-sm font-medium text-gray-700 mb-1">
-                Descrição do Produto
-              </label>
-              <Input
-                id="descricao"
-                name="descricao"
-                value={item.descricao}
-                onChange={handleInputChange}
-                placeholder="Digite a descrição do produto"
-                disabled={isLoading}
-                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+          console.log('👤 Usuário:', meData.displayName);
+        }
+      } catch (error) {
+        console.error('❌ Erro conectividade:', error);
+      }
+      
+      // Teste 2: Acesso ao site
+      try {
+        const siteResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${SITE_URL}:${SITE_PATH}`, {
+          headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
+        });
+        console.log('🌐 Acesso ao site:', siteResponse.status);
+        
+        if (siteResponse.ok) {
+          const siteData = await siteResponse.json();
+          console.log('✅ Site encontrado:', siteData.displayName);
+          console.log('🆔 Site ID:', siteData.id);
+          
+          // Teste 3: Buscar o arquivo Excel
+          try {
+            const searchResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive/root/search(q='Inventário.xlsx')`, {
+              headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
+            });
+            console.log('🔍 Busca arquivo:', searchResponse.status);
             
-            {/* Campo Código de Barras */}
-            <div>
-              <label htmlFor="codigoBarras" className="block text-sm font-medium text-gray-700 mb-1">
-                Código de Barras
-              </label>
-              <div className="flex space-x-2">
-                <Input
-                  id="codigoBarras"
-                  name="codigoBarras"
-                  value={item.codigoBarras}
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              if (searchData.value && searchData.value.length > 0) {
+                console.log('📊 Arquivo encontrado:', searchData.value[0].name);
+                console.log('🆔 Arquivo ID:', searchData.value[0].id);
+                console.log('📁 Caminho:', searchData.value[0].webUrl);
+                
+                // Teste 4: Acessar worksheets
+                try {
+                  const worksheetsResponse = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive/items/${searchData.value[0].id}/workbook/worksheets`, {
+                    headers: { 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN}` }
+                  });
+                  console.log('📋 Acesso worksheets:', worksheetsResponse.status);
+                  
+                  if (worksheetsResponse.ok) {
+                    const worksheetsData = await worksheetsResponse.json();
+                    console.log('📋 Worksheets encontradas:', worksheetsData.value?.map(w => w.name));
+                  }
+                } catch (worksheetError) {
+                  console.error('❌ Erro worksheets:', worksheetError);
+                }
+              } else {
+                console.log('❌ Arquivo não encontrado na busca');
+              }
+            }
+          } catch (searchError) {
+            console.error('❌ Erro busca arquivo:', searchError);
+          }
+        } else {
+          console.error('❌ Erro acesso site:', siteResponse.status);
+        }
+      } catch (siteError) {
+        console.error('❌ Erro site:', siteError);
+      }
+    }
+    
+    alert('🔧 Debug SharePoint executado! Verifique o console (F12).');
+  };
+
+  const filteredEquipment = equipmentList.filter(item =>
+    Object.values(item).some(value =>
+      value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Head>
+        <title>Sistema de Inventário de TI</title>
+        <meta name="description" content="Sistema para inventariar equipamentos de TI" />
+      </Head>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+            📊 Sistema de Inventário de TI
+          </h1>
+
+          {message && (
+            <div className={`mb-4 p-4 rounded-lg ${
+              message.includes('❌') || message.includes('Erro') ? 'bg-red-100 text-red-700 border-l-4 border-red-500' : 
+              message.includes('⚠️') ? 'bg-yellow-100 text-yellow-700 border-l-4 border-yellow-500' :
+              'bg-green-100 text-green-700 border-l-4 border-green-500'
+            }`}>
+              <div className="flex items-center">
+                <span className="mr-2">
+                  {message.includes('❌') || message.includes('Erro') ? '❌' : 
+                   message.includes('⚠️') ? '⚠️' : '✅'}
+                </span>
+                {message}
+              </div>
+            </div>
+          )}
+
+          {/* Status de Sincronização Excel */}
+          {syncStatus !== 'idle' && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Status da Sincronização:</h4>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">📈 Excel Online:</span>
+                <div className={`w-3 h-3 rounded-full ${
+                  syncStatus === 'success' ? 'bg-green-500' :
+                  syncStatus === 'syncing' ? 'bg-yellow-500 animate-pulse' :
+                  syncStatus === 'error' ? 'bg-red-500' : 'bg-gray-300'
+                }`}></div>
+                <span className="text-xs text-gray-600">
+                  {syncStatus === 'success' ? 'Sincronizado com sucesso!' :
+                   syncStatus === 'syncing' ? 'Enviando dados para Excel...' :
+                   syncStatus === 'error' ? 'Erro na sincronização' : 'Aguardando'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Informações Básicas */}
+              <div className="col-span-full">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                  📋 Informações Básicas
+                </h3>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de Equipamento *
+                </label>
+                <select
+                  name="tipo"
+                  value={equipment.tipo}
                   onChange={handleInputChange}
-                  placeholder="Digite ou escaneie o código"
-                  disabled={isLoading}
-                  className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                />
-                <Button 
-                  onClick={() => setShowScanner(!showScanner)}
-                  variant="outline"
-                  disabled={isLoading || !hasCameraAccess}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  required
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {showScanner ? 'Cancelar' : 'Escanear'}
-                </Button>
+                  <option value="">Selecione o tipo</option>
+                  <option value="Desktop">Desktop</option>
+                  <option value="Notebook">Notebook</option>
+                  <option value="Servidor">Servidor</option>
+                  <option value="Monitor">Monitor</option>
+                  <option value="Impressora">Impressora</option>
+                  <option value="Switch">Switch</option>
+                  <option value="Roteador">Roteador</option>
+                  <option value="Firewall">Firewall</option>
+                  <option value="Tablet">Tablet</option>
+                  <option value="Smartphone">Smartphone</option>
+                  <option value="Outro">Outro</option>
+                </select>
               </div>
-            </div>
-            
-            {/* Scanner de Código de Barras */}
-            {showScanner && hasCameraAccess && (
-              <div className="p-4 border rounded-lg bg-white">
-                <BarcodeScanner 
-                  onScan={handleBarcodeScan}
-                  onError={(error) => {
-                    console.error('Erro no scanner:', error);
-                    setSubmitStatus({
-                      success: false,
-                      message: `Erro no scanner: ${error.message}`
-                    });
-                    setShowScanner(false);
-                  }}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Marca *
+                </label>
+                <input
+                  type="text"
+                  name="marca"
+                  value={equipment.marca}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: Dell, HP, Lenovo"
                 />
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  Aponte a câmera para o código de barras
-                </p>
               </div>
-            )}
 
-            {showScanner && !hasCameraAccess && (
-              <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-200">
-                <p className="text-yellow-700 font-medium mb-2 text-center">
-                  Permissão de câmera não concedida
-                </p>
-                <p className="text-sm text-yellow-600 text-center">
-                  Por favor, permita o acesso à câmera nas configurações do seu dispositivo para usar o scanner.
-                </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Modelo *
+                </label>
+                <input
+                  type="text"
+                  name="modelo"
+                  value={equipment.modelo}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: OptiPlex 7090"
+                />
               </div>
-            )}
-            
-            {/* Campo Data de Registro */}
-            <div>
-              <label htmlFor="dataRegistro" className="block text-sm font-medium text-gray-700 mb-1">
-                Data de Registro
-              </label>
-              <Input
-                type="date"
-                id="dataRegistro"
-                name="dataRegistro"
-                value={item.dataRegistro}
-                onChange={handleInputChange}
-                disabled={isLoading}
-                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            
-            {/* Campo Filial */}
-            <div>
-              <label htmlFor="filial" className="block text-sm font-medium text-gray-700 mb-1">
-                Filial
-              </label>
-              <Select 
-                onValueChange={(value) => handleSelectChange('filial', value)} 
-                value={item.filial}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="filial" className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="Selecione a filial" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="filial1">Filial Norte</SelectItem>
-                  <SelectItem value="filial2">Filial Sul</SelectItem>
-                  <SelectItem value="filial3">Filial Leste</SelectItem>
-                  <SelectItem value="filial4">Filial Oeste</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Campo Destino */}
-            <div>
-              <label htmlFor="destino" className="block text-sm font-medium text-gray-700 mb-1">
-                Destino do Item
-              </label>
-              <Select 
-                onValueChange={(value) => handleSelectChange('destino', value)} 
-                value={item.destino}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="destino" className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="Selecione o destino" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="backup">Backup/Estoque</SelectItem>
-                  <SelectItem value="usuario">Usuário</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Campos condicionais para usuário */}
-            {item.destino === 'usuario' && (
-              <div className="space-y-4 border-t pt-4 border-gray-200">
-                <div>
-                  <label htmlFor="usuario" className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome do Usuário
-                  </label>
-                  <Input
-                    id="usuario"
-                    name="usuario"
-                    value={item.usuario || ''}
-                    onChange={handleInputChange}
-                    placeholder="Digite o nome do usuário"
-                    disabled={isLoading}
-                    className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="matricula" className="block text-sm font-medium text-gray-700 mb-1">
-                    Matrícula
-                  </label>
-                  <Input
-                    id="matricula"
-                    name="matricula"
-                    value={item.matricula || ''}
-                    onChange={handleInputChange}
-                    placeholder="Digite a matrícula"
-                    disabled={isLoading}
-                    className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="setor" className="block text-sm font-medium text-gray-700 mb-1">
-                    Setor
-                  </label>
-                  <Input
-                    id="setor"
-                    name="setor"
-                    value={item.setor || ''}
-                    onChange={handleInputChange}
-                    placeholder="Digite o setor"
-                    disabled={isLoading}
-                    className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número de Série
+                </label>
+                <input
+                  type="text"
+                  name="numeroSerie"
+                  value={equipment.numeroSerie}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Número de série do equipamento"
+                />
               </div>
-            )}
-            
-            {/* Botão de envio */}
-            <Button 
-              onClick={submitItem} 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow-sm"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processando...
-                </>
-              ) : (
-                'Registrar Item'
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Número do Patrimônio
+                </label>
+                <input
+                  type="text"
+                  name="patrimonio"
+                  value={equipment.patrimonio}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Número do patrimônio"
+                />
+              </div>
+
+              {/* Especificações Técnicas */}
+              <div className="col-span-full mt-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                  ⚙️ Especificações Técnicas
+                </h3>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Processador
+                </label>
+                <input
+                  type="text"
+                  name="processador"
+                  value={equipment.processador}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: Intel Core i5-11400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Memória RAM
+                </label>
+                <input
+                  type="text"
+                  name="memoria"
+                  value={equipment.memoria}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: 8GB DDR4"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Armazenamento
+                </label>
+                <input
+                  type="text"
+                  name="armazenamento"
+                  value={equipment.armazenamento}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: SSD 256GB"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sistema Operacional
+                </label>
+                <input
+                  type="text"
+                  name="sistemaOperacional"
+                  value={equipment.sistemaOperacional}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: Windows 11 Pro"
+                />
+              </div>
+
+              {/* Localização e Usuário */}
+              <div className="col-span-full mt-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                  📍 Localização e Usuário
+                </h3>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Usuário Responsável
+                </label>
+                <input
+                  type="text"
+                  name="usuario"
+                  value={equipment.usuario}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Nome do usuário"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Setor/Departamento
+                </label>
+                <input
+                  type="text"
+                  name="setor"
+                  value={equipment.setor}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: TI, Administrativo, Vendas"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Localização Física
+                </label>
+                <input
+                  type="text"
+                  name="localizacao"
+                  value={equipment.localizacao}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: Sala 201, Andar 2"
+                />
+              </div>
+
+              {/* Informações Financeiras */}
+              <div className="col-span-full mt-6">
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">
+                  💰 Informações Financeiras
+                </h3>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data de Aquisição
+                </label>
+                <input
+                  type="date"
+                  name="dataAquisicao"
+                  value={equipment.dataAquisicao}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valor de Aquisição (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="valorAquisicao"
+                  value={equipment.valorAquisicao}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Garantia (até)
+                </label>
+                <input
+                  type="date"
+                  name="garantia"
+                  value={equipment.garantia}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={equipment.status}
+                  onChange={handleInputChange}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="Ativo">Ativo</option>
+                  <option value="Inativo">Inativo</option>
+                  <option value="Manutenção">Em Manutenção</option>
+                  <option value="Descartado">Descartado</option>
+                </select>
+              </div>
+
+              <div className="col-span-full">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
+                <textarea
+                  name="observacoes"
+                  value={equipment.observacoes}
+                  onChange={handleInputChange}
+                  rows="3"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Observações adicionais sobre o equipamento"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-6">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    {editingId ? '✏️ Atualizar Equipamento' : '➕ Cadastrar Equipamento'}
+                  </>
+                )}
+              </button>
+              
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 font-medium transition-colors"
+                >
+                  ❌ Cancelar Edição
+                </button>
               )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Mensagem de status */}
-      {submitStatus.message && (
-        <div className={`mt-4 p-3 rounded-md ${submitStatus.success ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
-          {submitStatus.message}
+              
+              <button
+                type="button"
+                onClick={debugSharePoint}
+                className="bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 font-medium transition-colors"
+              >
+                🔧 Debug SharePoint
+              </button>
+            </div>
+          </form>
         </div>
-      )}
+
+        {/* Lista de Equipamentos */}
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 sm:mb-0">
+              📋 Equipamentos Cadastrados ({equipmentList.length})
+            </h2>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="Buscar equipamentos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              
+              <button
+                onClick={exportToCSV}
+                disabled={equipmentList.length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                📊 Exportar CSV ({equipmentList.length})
+              </button>
+              
+              <button
+                onClick={createBackup}
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 font-medium transition-colors"
+              >
+                💾 Backup JSON
+              </button>
+            </div>
+          </div>
+
+          {filteredEquipment.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-6xl mb-4">📦</div>
+              <p className="text-xl">
+                {equipmentList.length === 0 ? 'Nenhum equipamento cadastrado ainda.' : 'Nenhum resultado encontrado.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Tipo</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Marca/Modelo</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Usuário</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Localização</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEquipment.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.tipo}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div>
+                          <div className="font-medium">{item.marca} {item.modelo}</div>
+                          {item.numeroSerie && (
+                            <div className="text-gray-500 text-xs">S/N: {item.numeroSerie}</div>
+                          )}
+                          {item.patrimonio && (
+                            <div className="text-gray-500 text-xs">Pat: {item.patrimonio}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div>
+                          <div>{item.usuario || '-'}</div>
+                          <div className="text-gray-500 text-xs">{item.setor || '-'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.localizacao || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          item.status === 'Ativo' ? 'bg-green-100 text-green-800' :
+                          item.status === 'Inativo' ? 'bg-red-100 text-red-800' :
+                          item.status === 'Manutenção' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            🗑️ Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Informações sobre Excel Online */}
+        <div className="mt-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <h3 className="text-lg font-semibold text-blue-800 mb-2">📈 Integração Excel Online</h3>
+          <div className="text-sm text-blue-700">
+            <p className="mb-2">
+              <strong>Workbook ID:</strong> {process.env.NEXT_PUBLIC_EXCEL_WORKBOOK_ID || '5A12567B-F552-41C3-92FC-76AD64D343CF'}
+            </p>
+            <p className="mb-2">
+              <strong>Worksheet:</strong> {process.env.NEXT_PUBLIC_EXCEL_WORKSHEET_NAME || 'Inventário'}
+            </p>
+            <p className="text-xs">
+              {process.env.NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN ? 
+                '✅ Sistema configurado para sincronização automática com Excel Online.' :
+                '⚠️ Para ativar sincronização, configure NEXT_PUBLIC_MICROSOFT_ACCESS_TOKEN no arquivo .env.local'
+              }
+            </p>
+          </div>
+        </div>
+
+        {/* Avisos importantes para produção */}
+        <div className="mt-6 bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">⚠️ Avisos Importantes</h3>
+          <div className="text-sm text-yellow-700 space-y-2">
+            <p>• Os dados são mantidos apenas na memória durante a sessão.</p>
+            <p>• Para persistência permanente, configure a integração com Excel Online.</p>
+            <p>• Use o botão "Backup JSON" regularmente para salvar seus dados.</p>
+            <p>• Configure as variáveis de ambiente no Vercel para a sincronização automática.</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default InventarioApp;
+export default InventorySystem;

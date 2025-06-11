@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.13.1",
     "@radix-ui/react-select": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.0",
     "class-variance-authority": "^0.7.1",
@@ -29,7 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.2.2",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.9",
     "typescript": "^5"
   }
 }
