@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   viewport: "width=device-width, initial-scale=1",
   robots: "index, follow",
   openGraph: {
-    title: "Inventário Regional da TI",
+    title: "Inventário Regional da T.I.",
     description: "Sistema web para cadastro e controle de equipamentos de TI da empresa",
     type: "website",
     locale: "pt_BR",
